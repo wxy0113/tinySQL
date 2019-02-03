@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="tinySQL:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/tinySQL_jar</output-path>
+    <root id="archive" name="tinySQL.jar">
+      <element id="module-output" name="tinySQL" />
+    </root>
+  </artifact>
+</component>

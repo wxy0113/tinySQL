@@ -19,11 +19,16 @@ public class ParseTreeNode {
     public int orderID;
     public int distID;
 
+    public ExpressionTree expressionTree;
+
+
+
     ParseTreeNode(String s){
         this.type = s;
         this.distinct = false;
         this.where = false;
         this.attributes = new ArrayList<String>();
         this.tableList = new ArrayList<String>();
+        this.expressionTree = null;
     }
 }

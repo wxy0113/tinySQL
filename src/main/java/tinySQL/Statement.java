@@ -7,9 +7,9 @@ import java.util.List;
 
 public class Statement {
     public String tableName;
-    public List<String> attributesList;
-    public List<FieldType> typesList;
-    public List<List<String>> valuesList;
+    public ArrayList<String> attributesList;
+    public ArrayList<FieldType> typesList;
+    public ArrayList<List<String>> valuesList;
     public ParseTreeNode node;
     public Statement(){
         attributesList = new ArrayList<>();

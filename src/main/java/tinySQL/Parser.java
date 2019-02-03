@@ -50,7 +50,7 @@ public class Parser {
                 s = s.trim();
                 String[] name_type = s.split(" ");
                 state.attributesList.add(name_type[0]);
-                if(name_type[1].equals("INT")){
+                if(name_type[1].equalsIgnoreCase("INT")){
                     state.typesList.add(FieldType.INT);
                 }else{
                     state.typesList.add(FieldType.STR20);
@@ -90,59 +90,81 @@ public class Parser {
 
     public Statement parseSelect(String sql) {
         // Parse "SELECT"
-        // i.e. SELECT * FROM course WHERE exam = 100 AND project = 100
+        // i.e. SELECT * FROM course WHERE exam = 90 AND project = 100
         if (!validSelect(sql)) {
             System.out.println("Not Valid sql!");
             return null;
         }
-        String[] strs = sql.trim().replaceAll("[,\\s]", ",").split(",");
+        String[] strs = sql.trim().toLowerCase().replaceAll("\\[","").replaceAll("\\]","").replaceAll(",", "").split("\\s+");
+        // strs = [SELECT, *, FROM, course, WHERE, exam, =, 90, AND, project, =, 100]
+        //System.out.println(Arrays.asList(strs));
         Statement state = new Statement();
-        ParseTreeNode node = new ParseTreeNode("SELECT");
+        ParseTreeNode node = new ParseTreeNode("select");
 
         for (int i = 0; i < strs.length; i++) {
             String s = strs[i];
-            if (s.equals("DISTINCT")) {
+            // Handle distinct
+            if (s.equalsIgnoreCase("DISTINCT")) {
                 node.distinct = true;
                 node.distID = i;
             }
-            if (s.equals("FROM")) {
+            // Handle from
+            if (s.equalsIgnoreCase("FROM")) {
                 node.fromID = i;
             }
-            if (s.equals("WHERE")) {
+            // Handle where
+            if (s.equalsIgnoreCase("WHERE")) {
                 node.where = true;
                 node.whereID = i;
             }
+            // Handle order by
             if (i < strs.length-1) {
-                if (s.equals("ORDER") && strs[i+1].equals("BY")) {
+                if (s.equalsIgnoreCase("ORDER") && strs[i+1].equalsIgnoreCase("BY")) {
                     node.order = true;
                     node.orderID = i;
                 }
             }
-
-            if (node.distinct) {
-                node.selectList = strs[node.distID+1];
-                node.attributes = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, 2, node.fromID)));
-            } else {
-                node.attributes = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, 1, node.fromID)));
-            }
-            if (node.where) {
-                node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, node.whereID)));
-                if (node.order) {
-                    String[] searchCondition = Arrays.copyOfRange(strs, node.whereID+1, node.orderID);
-                    // Expression Tree
-                }
-            } else {
-                if (node.order) {
-                    node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, node.orderID)));
-                } else {
-                    node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, strs.length)));
-                }
-            }
+        }
+        if (node.distinct) {
+            node.selectList = strs[node.distID+1];
+            node.attributes = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, 2, node.fromID)));
+        } else {
+            node.attributes = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, 1, node.fromID)));
+        }
+        if (node.where) {
+            node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, node.whereID)));
             if (node.order) {
+                String[] searchCondition = Arrays.copyOfRange(strs, node.whereID+1, node.orderID);
+                // Expression Tree
+                node.expressionTree = new ExpressionTree(searchCondition);
+                //node.expressionTree.printTree();
                 node.orderBy = strs[strs.length-1];
+                //System.out.println(searchCondition);
+                // After ExpressionTree
+                /*
+                       =              =
+                     /    \         /   \
+                    exam   90   project  100
+                 */
+            } else {
+                String[] searchCondition = Arrays.copyOfRange(strs, node.whereID+1, strs.length);
+                node.expressionTree = new ExpressionTree(searchCondition);
+                //node.expressionTree.printTree();
+                //System.out.println(node.expressionTree.subconditions);
+            }
+        } else {
+            if (node.order) {
+                node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, node.orderID)));
+            } else {
+                node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, strs.length)));
             }
         }
+        if (node.order) {
+            node.orderBy = strs[strs.length-1];
+        }
         state.node = node;
+        //System.out.println(node.tableList);
+        //System.out.println(node.attributes);
         return state;
     }
 
@@ -203,13 +225,85 @@ public class Parser {
         return state;
     }
 
+    public Statement[] parseInsertForSelect(String sql) {
+        String temp = sql.trim().toLowerCase();
+        sql = sql.trim();
+        Statement[] state = new Statement[2];
+        int second = temp.indexOf("select");
+        String insert = sql.substring(0, second);
+        String select = sql.substring(second);
+        //String[] splitResult = insert.split("[\\s]+");
+        state[0] = new Statement();
+        Pattern p = Pattern.compile("INSERT[\\s]+INTO[\\s]+(.+)[\\s]+\\((.*)\\)[\\s]");
+        Matcher m = p.matcher(insert);
+        while (m.find()) {
+            System.out.println(m.group(0));
+            System.out.println(m.group(1));
+            System.out.println(m.group(2));
+            state[0].tableName = m.group(1);
+            String[] tempList = m.group(2).split(",");
+            for(String s : tempList){
+                s = s.trim();
+                state[0].attributesList.add(s.split(" ")[0]);
+            }
+        }
+        state[1] = parseSelect(select.trim());
+        //String tableName = splitResult[2];
+        //ParseTreeNode parserTree = parseSelect(select).node;
+//        String[] splitResult = sql.split("[\\s]+", 4);
+//        state.tableName = splitResult[2];
+//        String selectCondition = splitResult[3];
+//        state.node = parseSelect(selectCondition).node;
+        return state;
+    }
+
+    public Statement parseDelete(String sql) {
+        if (!validDelete(sql)) {
+            System.out.println("Not Valid sql!");
+            return null;
+        }
+        String[] strs = sql.trim().replaceAll("[,\\s]", ",").split(",");
+        ParseTreeNode node = new ParseTreeNode("delete");
+        Statement state = new Statement();
+
+        for (int i = 0; i < strs.length; i++) {
+            String s = strs[i];
+            if (s.equalsIgnoreCase("FROM")) {
+                node.fromID = i;
+            }
+            if (s.equalsIgnoreCase("WHERE")) {
+                node.where = true;
+                node.whereID = i;
+            }
+        }
+
+        if (node.where) {
+            node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, node.whereID)));
+            String[] searchCondition = Arrays.copyOfRange(strs, node.whereID+1, strs.length);
+            node.expressionTree = new ExpressionTree(searchCondition);
+            //node.expressionTree.printTree();
+            //System.out.println(node.expressionTree.subconditions);
+        } else {
+            node.tableList = new ArrayList<>(Arrays.asList(Arrays.copyOfRange(strs, node.fromID+1, strs.length)));
+        }
+        state.node = node;
+        return state;
+    }
+
     public static void main(String[] args) {
         String test1 = "CREATE TABLE course (sid INT, homework INT, project INT, exam INT, grade STR20) ";
         String test2 = "DROP TABLE course";
-        String test3 = "INSERT INTO course (sid, homework, project, exam, grade) VALUES (1, 99, 100, 100, \"A\")";
+        String test3 = "INSERT INTO course (sid, homework, project, exam, grade)";
+        String test4 = "INSERT INTO course (sid, homework, project, exam, grade) SELECT * FROM course";
+        String test5 = "DELETE FROM course WHERE grade = \"E\"";
+        String test6 = "SELECT * FROM course";
         Parser p = new Parser();
-        p.parseCreate(test1);
-        p.parseDrop(test2);
-        p.parseInsert(test3);
+        //
+        //p.parseCreate(test1);
+        //p.parseDrop(test2);
+        //p.parseInsert(test3);
+        //p.parseInsertForSelect(test4);
+        //p.parseDelete(test5);
+        p.parseSelect(test6);
     }
 }
